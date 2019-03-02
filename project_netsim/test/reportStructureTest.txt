@@ -1,0 +1,20 @@
+== LOADING RAMPS ==
+
+LOADING RAMP #1
+  Delivery interval: 3
+  Receivers:
+    worker #1
+
+
+== WORKERS ==
+
+WORKER #1
+  Processing time: 2
+  Queue type: FIFO
+  Receivers:
+    storehouse #1
+
+
+== STOREHOUSES ==
+
+STOREHOUSE #1

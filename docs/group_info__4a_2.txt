@@ -1,0 +1,8 @@
+﻿Członkowie grupy 4a_2:
+(1) Karol Stryczek, 297457
+(2) Karolina Świerczek, 297464
+(3) Małgorzata Śliwińska, 297462
+
+Kierownik grupy: Karol Stryczek
+
+URL repozytorium: https://bitbucket.org/KarolStryczek/agh_air_inf2_2018_netsim__4a_2

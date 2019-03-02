@@ -1,0 +1,347 @@
+﻿@startuml
+' 4a_2: Stryczek (297457), Świerczek (297464), Śliwińska(297462)
+' TODO
+
+' --------
+
+' ==== < CONFIGURATION > ====
+
+hide empty members
+hide <<function>> circle
+
+' ==== END of < CONFIGURATION > ====
+
+package "Factory Package" {
+
+	class NodeCollection<Node> << (T,olive) >> {
+	- _nodes: std::list<Node>
+	+ NodeCollection()
+	+ findByID(ElementID): std::list<Node>::iterator
+	+ removeByID(ElementID): bool
+	+ add(Node): void
+	+ push_back(): void
+	+ begin(): std::list<Node>::iterator
+	+ cbegin(): std::list<Node>::const_iterator
+	+ end(): std::list<Node>::iterator
+	+ cend(): std::list<Node>::const_iterator
+	+ getNodes(): std::list<Node> 
+	}
+
+	class Ramps {
+	}
+
+	class Workers {
+	}
+
+	class Storehouses {
+	}
+
+	Ramps "<<bind>>"--|> NodeCollection
+	Workers "<<bind>>"--|> NodeCollection
+	Storehouses "<<bind>>"--|> NodeCollection
+
+	class Factory {
+	-_ramps: NodeCollection<Ramp>
+	-_workers: NodeCollection<Worker>
+	-_storehouses: NodeCollection<Storehouse>
+	+ Factory()
+	+ findRampByID(ElementID): std::list<Ramp>::iterator
+	+ findWorkerByID(ElementID): std::list<Worker>::iterator
+	+ findStorehouseByID(ElementID): std::list<Storehouse>::iterator
+	+ removeRampByID(ElementID): void
+	+ removeWorkerByID(ElementID): void
+	+ removeStorehouseByID(ElementID): void
+	+ addRamp(ElementID, int): void
+	+ addWorker(ElementID, int, QueueType): void
+	+ addStorehouse(ElementID): void
+	+ addLink(ElementsOfNetwork, ElementID, ElementsOfNetwork, ElementID): void
+	+ removeLink(ElementsOfNetwork, ElementID, ElementsOfNetwork, ElementID): void
+	+ getRamp(): Ramp
+	+ getWorker(): Worker
+	+ getStorehouse(): Storehouse
+	+ verifyCohesion(): bool
+	- isOkWorker(Worker): bool
+	}
+	
+	Factory *-- Ramps
+	Factory *-- Workers
+	Factory *-- Storehouses
+
+}
+' == END of package "Factory"
+IO "<<uses>>"..> Factory
+
+package "Report Generation" {
+
+	interface IReportNotifier <<interface>> {
+	+ {abstract} shouldGenerateReport(Time): bool
+	}
+
+	class SpecificTurnsReportNotifier {
+	- _turnsSet: std::set<Time>
+	+ shouldGenerateReport(Time): bool
+	+ SpecificTurnsReportNotifier(std::set<Time>)
+	+ getTurnsSet(): std::set<Time>
+	}
+	SpecificTurnsReportNotifier ..|> IReportNotifier
+
+	class IntervalReportNotifier {
+	- _intervalBetweenTurns: TimeOffset
+	+ shouldGenerateReport(Time): bool
+	+ IntervalReportNotifier(TimeOffset)
+	+ getIntervalBetweenTurns(): TimeOffset
+	}
+	IntervalReportNotifier ..|> IReportNotifier 
+
+	class Reporting <<function>> {
+	generateStructureReport(std::ostream, Factory&): void
+	generateStructureReportToFile(std::string, Factory&): bool
+	generateSimulationTurnReport(std::ostream, Factory&): void
+	generateSimulationTurnReportToFile(std::string, Factory&): bool
+	}
+
+}
+' == END of package "Report Generation"
+
+class Simulation <<function>> {
+	simulate(Factory &, Time, std::ostream, IReportNotifier): bool
+}
+
+Simulation "<<uses>>"..> Factory
+Reporting <.."<<uses>>" Simulation
+IReportNotifier <.."<<uses>>" Simulation
+
+
+package "Storage" {
+
+	interface IPackageStockpile <<interface>> {
+        + {abstract} push(Package&&): void
+
+        + {abstract} begin(): constIterator
+        + {abstract} end(): constIterator
+        + {abstract} cbegin(): constIterator
+        + {abstract} cend(): constIterator
+	} 
+
+        class constIterator << (T,orchid) primitive>>
+	constIterator -[hidden]> IPackageStockpile
+
+
+	interface IPackageQueue <<interface>> {
+        + {abstract} pop(): Package 
+        + {abstract} getQueueType(): QueueType
+	} 
+	IPackageQueue --|> IPackageStockpile
+
+	enum QueueType <<enumeration>> {
+        + FIFO
+        + LIFO
+	}
+	QueueType "<<uses>>"<.. IPackageQueue
+
+	class PackageQueue {
+        - _packageQueue: std::deque<Package>
+        - _queueType: QueueType
+
+        + PackageQueue(QueueType queueType)
+        + push(Package&&): void
+        + pop(): Package
+        + getQueueType(): QueueType
+
+        + begin(): constIterator
+        + end(): constIterator
+        + cbegin(): constIterator
+        + cend(): constIterator
+	}
+	PackageQueue ..|> IPackageQueue
+
+	class Package {
+        - {static} _lastAssignedID: ElementID
+        - _packageID: ElementID
+
+        + Package()
+        + getPackageID(): ElementID
+	}
+
+        Package --* PackageQueue
+
+        class constIterator << (T,orchid) primitive>>
+	constIterator -[hidden]> IPackageStockpile
+
+}
+' == END of package "Storage"
+
+
+package "Nodes" {
+
+	interface IPackageReceiver <<interface>> {
+        + {abstract} collectPackage(Package&&): void
+        + {abstract} getReceiverType(): ReceiverType
+        + {abstract} getID(): ElementID
+ 
+        + {abstract} begin(): constIterator
+        + {abstract} end(): constIterator
+        + {abstract} cbegin(): constIterator
+        + {abstract} cend(): constIterator
+	}
+
+	enum ReceiverType <<enumeration>> {
+        + Worker
+        + Storehouse
+	}
+	IPackageReceiver "<<uses>>"..> ReceiverType
+
+
+	class ReceiverPreferences {
+        - _preferences: Mapping[IPackageReceiver*, double]
+
+
+        + ReceiverPreferences(std::function<double()>)
+        + chooseReceiver(): IPackageReceiver*
+        + addReceiver(IPackageReceiver*, double): bool
+        + removeReceiver(IPackageReceiver*): bool
+        + getPreferences(): Mapping[IPackageReceiver*, double]
+  
+        + begin(): std::map<IPackageReceiver*, double>::iterator
+        + end(): std::map<IPackageReceiver*, double>::iterator
+        + begin(): std::map<IPackageReceiver*, double>::const_iterator
+        + end(): std::map<IPackageReceiver*, double>::const_iterator
+        + cbegin(): std::map<IPackageReceiver*, double>::const_iterator
+        + cend(): std::map<IPackageReceiver*, double>::const_iterator
+	}
+
+
+	class PackageSender {
+        # _receiverPreferences: ReceiverPreferences
+        # _toSendBuffer: std::pair<Package, bool>
+        
+        + PackageSender()
+        + sendPackage(): bool
+        + addReceiver(IPackageReceiver*, double): bool
+        + removeReceiver(IPackageReceiver*): bool
+        + getPreferences(): Mapping[IPackageReceiver*, double]
+        + {abstract} ~PackageSender()
+	}
+
+
+	PackageSender *-- ReceiverPreferences
+
+
+	class Ramp {
+        - _rampID: ElementID
+        - _deliveryInterval: int
+
+        + Ramp(ElementID, int)
+	+ getID(): ElementID
+	+ getDeliveryInterval(): int
+	+ deliverPackage(): bool
+	}
+
+
+	Ramp --|> PackageSender
+
+
+	class Worker {
+        - _workerID: ElementID
+        - _processInterval: int
+        - _packageQueue: std::unique_ptr<IPackageQueue>
+	- _processingBuffer: std::pair<Package, int>
+
+        + Worker(ElementID, int, std::unique_ptr<IPackageQueue>)
+        + collectPackage(Package&&): void
+        + process(): void
+        + getReceiverType(): ReceiverType
+        + getID(): ElementID
+        + getQueueType(): QueueType
+        + getProcessInterval(): int
+
+        + begin(): constIterator
+        + end(): constIterator
+        + cbegin(): constIterator
+        + cend(): constIterator
+	}
+
+
+	Worker --|> PackageSender
+	Worker ..|> IPackageReceiver
+	IPackageQueue --* Worker
+
+
+	class Storehouse {
+        - _storehouseID: ElementID
+        - _packageStockpile: std::unique_ptr<IPackageStockpile>
+        
+        + Storehouse(ElementID, std::unique_ptr<IPackageStockpile>)
+        + collectPackage(Package&&): bool
+        + getReceiverType(): ReceiverType
+        + getID(): ElementID
+
+        + begin(): constIterator
+        + end(): constIterator
+        + cbegin(): constIterator
+        + cend(): constIterator
+	}
+
+	Storehouse ..|> IPackageReceiver
+	IPackageStockpile --* Storehouse
+
+	Ramp -[hidden]> Worker
+	Worker -[hidden]> Storehouse
+
+	' == POSITIONING ==
+	PackageSender -[hidden]> IPackageReceiver
+	' == END of POSITIONING ==
+}
+' == END of package "Nodes"
+
+
+' .. HELPERS ----
+
+' .. DATA TYPES --
+together {
+	class Time << (T,orchid) primitive>>
+	class TimeOffset << (T,orchid) primitive>>
+	class ElementID << (T,orchid) primitive>>
+	class ProbabilityGenerator << (T,orchid) primitive>>
+
+	Time -[hidden]> TimeOffset
+	TimeOffset -[hidden]> ElementID
+	ElementID -[hidden]> ProbabilityGenerator
+}
+
+class IO <<function>> {
+	loadFactoryStructure(std::istream, Factory&): bool
+	loadFactoryStructureFromFile(std::string, Factory&): bool
+	saveFactoryStructure(std::ostream, Factory&): void
+	saveFactoryStructureToFile(std::string, Factory&): bool
+	syntaxAnalysis(std::vector<std::string>): std::vector<std::pair<std::string, std::map<std::string, std::string>>>
+	semanticCorrectness(std::vector<std::pair<std::string, std::map<std::string, std::string>>>, Factory&): void
+}
+enum ElementsOfNetwork <<enumeration>> {
+	+ Ramp
+	+ Worker
+	+ Storehouse
+	+ Link
+	}
+
+	ElementsOfNetwork "<<uses>>"<.. IO
+
+' == END of together
+
+
+' ==== < POSITIONING > ====
+
+IO <-[hidden]- IntervalReportNotifier
+Time <-[hidden]- Package
+
+ReceiverPreferences <-[hidden]- IPackageStockpile
+
+IPackageStockpile -[hidden]-> Storehouse
+
+"Factory Package" +- "Nodes"
+
+IReportNotifier -[hidden]> Reporting
+
+' ==== END of < POSITIONING > ====
+' 4a_2: Stryczek (297457), Świerczek (297464), Śliwińska(297462)
+@enduml
